@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+ultralytics
+python-multipart
+pillow
+opencv-python-headless
+pyyaml
+easyocr
