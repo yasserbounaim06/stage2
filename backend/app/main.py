@@ -132,6 +132,53 @@ async def upload_dataset(
             detail=f"An error occurred while saving/validating the dataset: {str(e)}"
         )
 
+@app.get("/api/datasets", response_model=List[DatasetUploadResponse])
+def list_datasets(db: Session = Depends(get_db)):
+    """
+    Lists all uploaded datasets.
+    """
+    datasets = db.query(DatasetUpload).order_by(DatasetUpload.uploaded_at.desc()).all()
+    return datasets
+
+@app.delete("/api/datasets/{dataset_id}")
+def delete_dataset(dataset_id: int, db: Session = Depends(get_db)):
+    """
+    Deletes a dataset, cleans up files on disk, and cascade-deletes associated training runs.
+    """
+    dataset = db.query(DatasetUpload).filter(DatasetUpload.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset with ID {dataset_id} not found."
+        )
+        
+    try:
+        # Find all model versions associated with this dataset's training jobs
+        jobs = db.query(TrainingJob).filter(TrainingJob.dataset_id == dataset_id).all()
+        for job in jobs:
+            if job.model_version:
+                model_path = Path(job.model_version.model_path)
+                if model_path.exists() and model_path.is_file():
+                    try:
+                        model_path.unlink()
+                        print(f"Deleted model weights file: {model_path}")
+                    except Exception as e:
+                        print(f"Error deleting model weights file: {e}")
+                        
+        # Delete dataset files on disk
+        StorageService.clean_dataset_dir(dataset_id)
+        
+        # Delete from database (cascades to jobs, model versions, etc.)
+        db.delete(dataset)
+        db.commit()
+        return {"message": f"Dataset {dataset_id} ('{dataset.name}') and all associated training jobs / models were deleted."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete dataset: {str(e)}"
+        )
+
 @app.post("/api/training/start", response_model=TrainingJobResponse, status_code=status.HTTP_202_ACCEPTED)
 def start_training(payload: TrainingStartRequest, db: Session = Depends(get_db)):
     """
@@ -233,6 +280,49 @@ def activate_model(model_id: int, db: Session = Depends(get_db)):
     model.is_active = True
     db.commit()
     return {"message": f"Model '{model.version_name}' is now set as the active model."}
+
+@app.delete("/api/models/{model_id}")
+def delete_model(model_id: int, db: Session = Depends(get_db)):
+    """
+    Deletes a registered model version and cleans up the weight file on disk.
+    """
+    model = db.query(ModelVersion).filter(ModelVersion.id == model_id).first()
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model version with ID {model_id} not found."
+        )
+        
+    was_active = model.is_active
+    
+    try:
+        # Delete file on disk
+        model_path = Path(model.model_path)
+        if model_path.exists() and model_path.is_file():
+            try:
+                model_path.unlink()
+                print(f"Deleted model weights file: {model_path}")
+            except Exception as e:
+                print(f"Error deleting model weights file: {e}")
+                
+        db.delete(model)
+        db.commit()
+        
+        if was_active:
+            # Try to activate the default base model version or another existing version
+            remaining_model = db.query(ModelVersion).order_by(ModelVersion.id.desc()).first()
+            if remaining_model:
+                remaining_model.is_active = True
+                db.commit()
+                print(f"Activated next available model: {remaining_model.version_name}")
+                
+        return {"message": f"Model version {model_id} ('{model.version_name}') was successfully deleted."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete model version: {str(e)}"
+        )
 
 @app.post("/api/inference/detect", response_model=DetectionResultResponse)
 async def run_detection(

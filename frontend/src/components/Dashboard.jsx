@@ -217,7 +217,7 @@ export default function Dashboard({ setActiveTab, setJobContextId }) {
                     <div className="col-md-7">
                       <span className="text-muted small d-block">Container Number</span>
                       <h4 className="fw-bold text-teal glow-teal mb-2 font-monospace">
-                        {latestInf.detections[0]?.text || "BMOU 182736 4"}
+                        {latestInf.detections[0]?.text || latestInf.container_number || "No text detected"}
                       </h4>
                       <div className="d-flex justify-content-between border-top border-secondary pt-2">
                         <div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { startTraining, getTrainingStatus, getDashboardStats } from "../services/api";
+import { startTraining, getTrainingStatus, getDashboardStats, getDatasets } from "../services/api";
 import { Cpu, Play, Terminal, CheckCircle, AlertCircle, RefreshCw, BarChart2 } from "lucide-react";
 
 export default function TrainingHub({ activeJobId, setActiveJobId, datasetContextId }) {
@@ -12,11 +12,26 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [datasets, setDatasets] = useState([]);
+
+  // Fetch available datasets
+  useEffect(() => {
+    const fetchDatasets = async () => {
+      try {
+        const data = await getDatasets();
+        // filter only validated datasets
+        setDatasets(data.filter(ds => ds.is_validated));
+      } catch (err) {
+        console.error("Failed to load datasets:", err);
+      }
+    };
+    fetchDatasets();
+  }, []);
 
   // Sync selectedDatasetId with prop context if it updates
   useEffect(() => {
     if (datasetContextId) {
-      setSelectedDatasetId(datasetContextId);
+      setSelectedDatasetId(datasetContextId.toString());
     }
   }, [datasetContextId]);
 
@@ -148,22 +163,21 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
 
               <form onSubmit={handleStart}>
                 <div className="mb-3">
-                  <label className="form-label text-muted small fw-semibold">Dataset ID</label>
-                  {datasetContextId ? (
-                    <div className="form-control form-control-custom text-white" style={{ background: "rgba(99, 102, 241, 0.05)" }}>
-                      Dataset #{datasetContextId} (Selected Upload)
-                    </div>
-                  ) : (
-                    <input
-                      type="number"
-                      placeholder="Enter Dataset ID"
-                      value={selectedDatasetId}
-                      onChange={(e) => setSelectedDatasetId(e.target.value)}
-                      className="form-control form-control-custom"
-                      required
-                    />
-                  )}
-                  <span className="text-muted small mt-1 d-block">Ensure this dataset ID has passed validation checks.</span>
+                  <label className="form-label text-muted small fw-semibold">Select Dataset</label>
+                  <select
+                    value={selectedDatasetId}
+                    onChange={(e) => setSelectedDatasetId(e.target.value)}
+                    className="form-select form-control-custom text-white"
+                    required
+                  >
+                    <option value="" style={{ color: '#000' }}>-- Select Validated Dataset --</option>
+                    {datasets.map(ds => (
+                      <option key={ds.id} value={ds.id} style={{ color: '#000' }}>
+                        #{ds.id} - {ds.name} ({ds.num_images} images)
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-muted small mt-1 d-block">Only successfully validated datasets are available.</span>
                 </div>
 
                 <div className="row g-3 mb-3">

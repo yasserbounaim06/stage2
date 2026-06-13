@@ -27,6 +27,25 @@ export const uploadDataset = async (name, file) => {
   return response.json();
 };
 
+export const getDatasets = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/datasets`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch datasets list");
+  }
+  return response.json();
+};
+
+export const deleteDataset = async (datasetId) => {
+  const response = await fetch(`${API_BASE_URL}/api/datasets/${datasetId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: "Failed to delete dataset" }));
+    throw new Error(errorData.detail || "Failed to delete dataset");
+  }
+  return response.json();
+};
+
 export const startTraining = async (datasetId, epochs, batchSize, imgsz, baseModel) => {
   const response = await fetch(`${API_BASE_URL}/api/training/start`, {
     method: "POST",
@@ -79,6 +98,17 @@ export const activateModel = async (modelId) => {
   });
   if (!response.ok) {
     throw new Error("Failed to activate model");
+  }
+  return response.json();
+};
+
+export const deleteModel = async (modelId) => {
+  const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: "Failed to delete model" }));
+    throw new Error(errorData.detail || "Failed to delete model");
   }
   return response.json();
 };

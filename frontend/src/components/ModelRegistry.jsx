@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { getModels, activateModel } from "../services/api";
-import { Award, CheckCircle, RefreshCw, Calendar, Tag, ShieldAlert } from "lucide-react";
+import { getModels, activateModel, deleteModel } from "../services/api";
+import { Award, CheckCircle, RefreshCw, Calendar, Tag, ShieldAlert, Trash2 } from "lucide-react";
 
 export default function ModelRegistry() {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actLoadingId, setActLoadingId] = useState(null);
+  const [delLoadingId, setDelLoadingId] = useState(null);
 
   const fetchModels = async () => {
     try {
@@ -38,6 +39,25 @@ export default function ModelRegistry() {
       alert("Failed to activate model version.");
     } finally {
       setActLoadingId(null);
+    }
+  };
+
+  const handleDeleteModel = async (modelId) => {
+    if (!window.confirm("Are you sure you want to delete this model version weights file? This cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setDelLoadingId(modelId);
+      await deleteModel(modelId);
+      // Re-fetch list
+      const data = await getModels();
+      setModels(data);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to delete model version.");
+    } finally {
+      setDelLoadingId(null);
     }
   };
 
@@ -135,27 +155,38 @@ export default function ModelRegistry() {
                     </div>
                   </div>
 
-                  {model.is_active ? (
-                    <button className="btn btn-glass w-100" disabled>
-                      Selected for Inference
-                    </button>
-                  ) : (
+                  <div className="d-flex gap-2">
+                    {model.is_active ? (
+                      <button className="btn btn-glass flex-grow-1" disabled>
+                        Selected for Inference
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleActivate(model.id)}
+                        className="btn btn-indigo flex-grow-1 d-flex align-items-center justify-content-center gap-1 small"
+                        disabled={actLoadingId !== null || delLoadingId !== null}
+                      >
+                        {actLoadingId === model.id ? (
+                          <RefreshCw size={12} className="spin-animation" />
+                        ) : (
+                          <Award size={12} />
+                        )}
+                        <span>Set Active</span>
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleActivate(model.id)}
-                      className="btn btn-indigo w-100 d-flex align-items-center justify-content-center gap-2"
-                      disabled={actLoadingId !== null}
+                      onClick={() => handleDeleteModel(model.id)}
+                      className="btn btn-glass btn-sm text-rose border-rose-hover px-3"
+                      disabled={model.is_active || delLoadingId !== null || actLoadingId !== null}
+                      title={model.is_active ? "Cannot delete active model" : "Delete model"}
                     >
-                      {actLoadingId === model.id ? (
-                        <>
-                          <RefreshCw size={14} className="spin-animation" /> Activating...
-                        </>
+                      {delLoadingId === model.id ? (
+                        <RefreshCw size={12} className="spin-animation" />
                       ) : (
-                        <>
-                          <Award size={14} /> Set as Active Model
-                        </>
+                        <Trash2 size={12} />
                       )}
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>

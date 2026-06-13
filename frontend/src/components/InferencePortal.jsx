@@ -177,7 +177,7 @@ export default function InferencePortal() {
                     <div>
                       <span className="text-muted small d-block mb-1">Extracted Container Number</span>
                       <h3 className="mb-0 fw-bold text-teal glow-teal font-monospace">
-                        {result.detections[0]?.text || "BMOU 182736 4"}
+                        {result.detections[0]?.text || result.container_number || "No text detected"}
                       </h3>
                     </div>
                     <div className="text-end">
