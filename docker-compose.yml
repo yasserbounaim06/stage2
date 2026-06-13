@@ -9,12 +9,6 @@ services:
     restart: unless-stopped
     volumes:
       - ./backend/data:/app/data
-    environment:
-      - VAST_API_KEY=${VAST_API_KEY}
-      - SALAD_API_KEY=${SALAD_API_KEY}
-      - SALAD_ORG_NAME=${SALAD_ORG_NAME}
-      - SALAD_PROJECT_NAME=${SALAD_PROJECT_NAME}
-      - PUBLIC_BACKEND_URL=${PUBLIC_BACKEND_URL}
     ports:
       - "8000:8000"
 
@@ -25,6 +19,6 @@ services:
     container_name: yolo-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend

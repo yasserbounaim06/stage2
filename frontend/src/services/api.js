@@ -102,21 +102,6 @@ export const runInference = async (modelId, file) => {
   return response.json();
 };
 
-export const cancelTraining = async (jobId) => {
-  const response = await fetch(`${API_BASE_URL}/api/training/cancel/${jobId}`, {
-    method: "POST",
-  });
-  if (!response.ok) {
-    throw new Error("Failed to cancel training job");
-  }
-  return response.json();
-};
 
-export const getTrainingLogs = async (jobId) => {
-  const response = await fetch(`${API_BASE_URL}/api/training/logs/${jobId}`);
-  if (!response.ok) {
-    throw new Error("Failed to retrieve training logs");
-  }
-  return response.json();
-};
+
 

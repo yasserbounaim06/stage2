@@ -270,9 +270,12 @@ class TrainingService:
         # Register callbacks
         model.add_callback("on_fit_epoch_end", on_train_epoch_end)
         
+        # Auto-detect hardware: use CUDA GPU if available, else fall back to CPU
+        import torch
+        device_val = 0 if torch.cuda.is_available() else "cpu"
+        print(f"Training Service: Starting YOLO on device={device_val}")
+
         # Start fine-tuning
-        # project and name control where Ultralytics puts outputs: project/name
-        # we disable plotting to prevent Windows matplotlib GUI thread locks, but save training graphs
         model.train(
             data=str(yaml_path.absolute().as_posix()),
             epochs=epochs,
@@ -280,7 +283,7 @@ class TrainingService:
             imgsz=imgsz,
             project=str(run_dir.parent.absolute().as_posix()),
             name=run_dir.name,
-            device="cpu", # Default to CPU to ensure reliability across dev machines, change to device=0 if GPU wanted
+            device=device_val,
             plots=True,
             verbose=False
         )

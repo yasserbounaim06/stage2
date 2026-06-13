@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { startTraining, getTrainingStatus, getDashboardStats, cancelTraining, getTrainingLogs } from "../services/api";
-import { Cpu, Play, Terminal, CheckCircle, AlertCircle, RefreshCw, BarChart2, XCircle, FileText } from "lucide-react";
+import { startTraining, getTrainingStatus, getDashboardStats } from "../services/api";
+import { Cpu, Play, Terminal, CheckCircle, AlertCircle, RefreshCw, BarChart2 } from "lucide-react";
 
 export default function TrainingHub({ activeJobId, setActiveJobId, datasetContextId }) {
   const [epochs, setEpochs] = useState(10);
@@ -12,11 +12,6 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Remote Log States
-  const [logs, setLogs] = useState("");
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [showLogsTab, setShowLogsTab] = useState(false);
 
   // Sync selectedDatasetId with prop context if it updates
   useEffect(() => {
@@ -32,22 +27,24 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
       const data = await getTrainingStatus(activeJobId);
       setJob(data);
       if (data.status === "COMPLETED" || data.status === "FAILED") {
+        // Stop polling active job id once completed
         setActiveJobId(null);
       }
     } catch (err) {
       console.error(err);
-      setError("Failed to fetch remote training progress.");
+      setError("Failed to fetch training progress.");
     }
   };
 
   useEffect(() => {
     if (activeJobId) {
       fetchJobStatus();
-      const interval = setInterval(fetchJobStatus, 5000); // 5s interval for remote queries
+      const interval = setInterval(fetchJobStatus, 3000);
       return () => clearInterval(interval);
     }
   }, [activeJobId]);
 
+  // If there's an active job but we just opened the page, fetch it once
   useEffect(() => {
     if (activeJobId) {
       fetchJobStatus();
@@ -65,43 +62,13 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
     try {
       setLoading(true);
       setError(null);
-      setLogs("");
       const data = await startTraining(dsId, epochs, batchSize, imgsz, baseModel);
       setActiveJobId(data.id);
       setJob(data);
     } catch (err) {
-      setError(err.message || "Failed to submit remote training job.");
+      setError(err.message || "Failed to start training.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleCancel = async () => {
-    if (!job?.id) return;
-    if (!window.confirm("Are you sure you want to cancel this remote training job? This will terminate the GPU instance.")) return;
-    
-    try {
-      setLoading(true);
-      await cancelTraining(job.id);
-      fetchJobStatus();
-    } catch (err) {
-      setError(err.message || "Failed to cancel remote job.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchRemoteLogs = async () => {
-    if (!job?.id) return;
-    try {
-      setLogsLoading(true);
-      const data = await getTrainingLogs(job.id);
-      setLogs(data.logs || "No logs available yet.");
-    } catch (err) {
-      console.error(err);
-      setLogs("Failed to retrieve logs from remote instance.");
-    } finally {
-      setLogsLoading(false);
     }
   };
 
@@ -115,6 +82,7 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
     }
   };
 
+  // Helper to render metrics history logs/graphs
   const renderMetricsLogs = () => {
     const jobMetrics = job?.metrics;
     let history = [];
@@ -128,7 +96,7 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
     }
 
     if (!history || history.length === 0) {
-      return <div className="text-muted small">Awaiting first epoch metrics from remote container...</div>;
+      return <div className="text-muted small">Awaiting first epoch metrics...</div>;
     }
 
     return (
@@ -145,6 +113,7 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
     );
   };
 
+  // Extract latest metrics
   const getLatestMetrics = () => {
     if (!job?.metrics) return null;
     try {
@@ -166,7 +135,7 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
             <div className="glass-header">
               <h5 className="mb-0 fw-bold text-white d-flex align-items-center gap-2">
                 <Cpu size={18} className="text-indigo" />
-                Configure Remote GPU Fine-Tuning
+                Configure Fine-Tuning
               </h5>
             </div>
 
@@ -194,6 +163,7 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
                       required
                     />
                   )}
+                  <span className="text-muted small mt-1 d-block">Ensure this dataset ID has passed validation checks.</span>
                 </div>
 
                 <div className="row g-3 mb-3">
@@ -254,11 +224,11 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
                 >
                   {loading ? (
                     <>
-                      <RefreshCw size={16} className="spin-animation" /> Deploying Container...
+                      <RefreshCw size={16} className="spin-animation" /> Launching Run...
                     </>
                   ) : (
                     <>
-                      <Play size={16} fill="white" /> Start Remote GPU Training
+                      <Play size={16} fill="white" /> Start YOLO Training
                     </>
                   )}
                 </button>
@@ -285,32 +255,16 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
             <div className="p-4">
               {job ? (
                 <div>
-                  {/* Remote Job Metadata */}
-                  <div className="row g-3 mb-4 bg-dark-opacity p-3 rounded-3 border border-secondary">
-                    <div className="col-6 col-md-3">
-                      <span className="text-muted d-block small">Local Reference</span>
-                      <span className="fw-bold text-white">Job #{job.id}</span>
-                    </div>
-                    <div className="col-6 col-md-3">
-                      <span className="text-muted d-block small">Provider</span>
-                      <span className="fw-bold text-teal text-uppercase">{job.provider || "PENDING"}</span>
-                    </div>
-                    <div className="col-12 col-md-6 text-md-end">
-                      <span className="text-muted d-block small">Remote Instance ID</span>
-                      <span className="fw-bold text-indigo font-monospace text-truncate d-block" title={job.remote_job_id}>
-                        {job.remote_job_id || "AWAITING ALLOCATION"}
-                      </span>
-                    </div>
-                  </div>
-
                   <div className="mb-4">
                     <div className="d-flex justify-content-between mb-2">
                       <div>
-                        <span className="text-muted small">Task Progress</span>
+                        <span className="text-muted d-block small">Training Run Reference</span>
+                        <span className="fw-bold text-white">Job #{job.id}</span>
                       </div>
                       <div className="text-end">
-                        <span className="fw-bold text-white small">
-                          Epoch {job.current_epoch} / {job.epochs}
+                        <span className="text-muted d-block small">Epoch Progress</span>
+                        <span className="fw-bold text-white">
+                          {job.current_epoch} / {job.epochs}
                         </span>
                       </div>
                     </div>
@@ -321,10 +275,7 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
                         style={{ width: `${job.progress_percent}%` }}
                       ></div>
                     </div>
-                    <div className="d-flex justify-content-between small text-muted">
-                      <span>Completion rate: {job.progress_percent}%</span>
-                      {job.remote_status && <span>Remote State: {job.remote_status}</span>}
-                    </div>
+                    <span className="text-muted small">Completion rate: {job.progress_percent}%</span>
                   </div>
 
                   {/* Real-time stats panels */}
@@ -355,72 +306,15 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
                     </div>
                   )}
 
-                  {/* Tabs to switch between logs and metrics */}
-                  <div className="d-flex gap-2 mb-3">
-                    <button 
-                      type="button"
-                      onClick={() => setShowLogsTab(false)} 
-                      className={`btn btn-sm flex-grow-1 ${!showLogsTab ? "btn-indigo" : "btn-glass"}`}
-                    >
-                      Epoch Metrics
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        setShowLogsTab(true);
-                        fetchRemoteLogs();
-                      }} 
-                      className={`btn btn-sm flex-grow-1 ${showLogsTab ? "btn-indigo" : "btn-glass"}`}
-                    >
-                      Remote Output Logs
-                    </button>
-                  </div>
-
                   {/* Terminal block logs */}
-                  {showLogsTab ? (
-                    <div>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <h6 className="text-muted small fw-bold mb-0 d-flex align-items-center gap-1">
-                          <FileText size={12} /> Standard stdout/stderr logs
-                        </h6>
-                        <button 
-                          onClick={fetchRemoteLogs} 
-                          className="btn btn-sm btn-glass py-0 px-2 small" 
-                          disabled={logsLoading}
-                        >
-                          {logsLoading ? "Refreshing..." : "Refresh"}
-                        </button>
-                      </div>
-                      <div className="terminal-block font-monospace small" style={{ whiteSpace: "pre-wrap" }}>
-                        {logsLoading ? "Fetching container logs from remote GPU provider..." : (logs || "No logs downloaded.")}
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <h6 className="text-muted small fw-bold mb-2">Metrics Log history</h6>
-                      {renderMetricsLogs()}
-                    </div>
-                  )}
-
-                  {/* Control actions */}
-                  <div className="d-flex gap-3 mt-4">
-                    {["PENDING", "TRAINING"].includes(job.status.toUpperCase()) && (
-                      <button 
-                        type="button"
-                        onClick={handleCancel} 
-                        className="btn btn-glass border-danger text-rose w-100 d-flex align-items-center justify-content-center gap-2"
-                        disabled={loading}
-                      >
-                        <XCircle size={16} /> Terminate & Stop Billing
-                      </button>
-                    )}
-                  </div>
+                  <h6 className="text-muted small fw-bold mb-2">Metrics Log history</h6>
+                  {renderMetricsLogs()}
 
                   {job.status === "COMPLETED" && (
                     <div className="alert alert-success glass-panel border-success mt-4 p-3 d-flex align-items-center gap-2" role="alert">
                       <CheckCircle size={20} className="text-teal" />
                       <div>
-                        <strong>Remote GPU training complete!</strong> Weights loaded successfully. The instance has been destroyed.
+                        <strong>Fine-tuning complete!</strong> Model weights registered as active. You can now use this model for inferences.
                       </div>
                     </div>
                   )}

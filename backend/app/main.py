@@ -133,7 +133,7 @@ async def upload_dataset(
         )
 
 @app.post("/api/training/start", response_model=TrainingJobResponse, status_code=status.HTTP_202_ACCEPTED)
-def start_training(payload: TrainingStartRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def start_training(payload: TrainingStartRequest, db: Session = Depends(get_db)):
     """
     Registers a training job and puts it in the background execution queue.
     """
@@ -164,15 +164,8 @@ def start_training(payload: TrainingStartRequest, background_tasks: BackgroundTa
     db.commit()
     db.refresh(job)
     
-    # Trigger remote training in background task
-    background_tasks.add_task(
-        remote_training_manager.start_training,
-        job.id,
-        job.epochs,
-        job.batch_size,
-        job.imgsz,
-        job.base_model
-    )
+    # Enqueue in local training manager
+    training_service.enqueue_job(job.id)
     
     return job
 
@@ -181,9 +174,6 @@ def get_training_status(job_id: int, db: Session = Depends(get_db)):
     """
     Gets real-time training progress details (status, epoch history, loss rates, metrics).
     """
-    # Sync job status with remote provider
-    remote_training_manager.sync_job_status(job_id)
-    
     job = db.query(TrainingJob).filter(TrainingJob.id == job_id).first()
     if not job:
         raise HTTPException(
@@ -191,109 +181,6 @@ def get_training_status(job_id: int, db: Session = Depends(get_db)):
             detail=f"Training job with ID {job_id} not found."
         )
     return job
-
-# NEW ROUTE: Serve dataset ZIP to remote container
-@app.get("/api/datasets/{dataset_id}/download")
-def download_dataset_zip(dataset_id: int, db: Session = Depends(get_db)):
-    """
-    Serves the dataset ZIP file to the remote container worker.
-    """
-    job = db.query(TrainingJob).filter(TrainingJob.id == dataset_id).first()
-    if not job:
-        dataset = db.query(DatasetUpload).filter(DatasetUpload.id == dataset_id).first()
-    else:
-        dataset = db.query(DatasetUpload).filter(DatasetUpload.id == job.dataset_id).first()
-        
-    if not dataset:
-        raise HTTPException(status_code=404, detail="Dataset upload records not found.")
-        
-    dataset_dir = Path(dataset.storage_path)
-    zip_files = list(dataset_dir.glob("*.zip"))
-    if not zip_files:
-        raise HTTPException(status_code=404, detail="ZIP file not found in storage.")
-        
-    from fastapi.responses import FileResponse
-    return FileResponse(path=str(zip_files[0].absolute()), filename=dataset.filename, media_type="application/zip")
-
-# NEW ROUTE: Remote training completion callback
-@app.post("/api/training/complete/{job_id}")
-async def training_complete_callback(
-    job_id: int,
-    status: str = Form(...),
-    metrics: str = Form(None),
-    error: str = Form(None),
-    file: UploadFile = File(None),
-    db: Session = Depends(get_db)
-):
-    """
-    Callback endpoint executed by the remote worker when training succeeds or fails.
-    Saves trained weights, registers model version, and triggers instance termination.
-    """
-    job = db.query(TrainingJob).filter(TrainingJob.id == job_id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Training job not found.")
-        
-    if status.lower() == "completed" and file:
-        # Save weights
-        MODEL_DIR.mkdir(parents=True, exist_ok=True)
-        model_filename = f"model_v{job_id}.pt"
-        model_dest = MODEL_DIR / model_filename
-        
-        file_bytes = await file.read()
-        with open(model_dest, "wb") as f:
-            f.write(file_bytes)
-            
-        # Deactivate existing active models
-        db.query(ModelVersion).update({ModelVersion.is_active: False})
-        
-        # Create Model Version entry
-        version_name = f"YOLO_v{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        model_version = ModelVersion(
-            training_job_id=job_id,
-            version_name=version_name,
-            model_path=str(model_dest.absolute()),
-            is_active=True,
-            metrics=metrics or "{}"
-        )
-        db.add(model_version)
-        
-        job.status = "COMPLETED"
-        job.progress_percent = 100.0
-        job.metrics = metrics or "{}"
-    else:
-        job.status = "FAILED"
-        job.error_message = error or "Training failed on remote worker instance."
-        
-    job.completed_at = datetime.utcnow()
-    db.commit()
-    
-    # Auto-terminate instance in background to stop billing
-    try:
-        remote_training_manager.cancel_training_job(job_id)
-    except Exception as e:
-        print(f"Error executing auto-termination callback: {e}")
-        
-    return {"message": "Callback processed successfully."}
-
-# NEW ROUTE: Manual cancellation
-@app.post("/api/training/cancel/{job_id}")
-def cancel_training(job_id: int, db: Session = Depends(get_db)):
-    """
-    Manually cancels the remote training run and terminates the instance.
-    """
-    success = remote_training_manager.cancel_training_job(job_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to cancel remote training job.")
-    return {"message": "Job successfully cancelled."}
-
-# NEW ROUTE: Fetch logs
-@app.get("/api/training/logs/{job_id}")
-def get_training_logs(job_id: int):
-    """
-    Retrieves standard outputs and errors from the remote GPU instance.
-    """
-    logs = remote_training_manager.fetch_logs(job_id)
-    return {"logs": logs}
 
 @app.get("/api/runs/{run_id}", response_model=RunDetailsResponse)
 def get_run_details(run_id: int, db: Session = Depends(get_db)):
