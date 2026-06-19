@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getDashboardStats } from "../services/api";
+import { getDashboardStats, API_BASE_URL } from "../services/api";
 import { Cpu, Database, Award, Activity, Image as ImageIcon, CheckCircle, Clock } from "lucide-react";
 
 export default function Dashboard({ setActiveTab, setJobContextId }) {
@@ -207,7 +207,7 @@ export default function Dashboard({ setActiveTab, setJobContextId }) {
                     <div className="col-md-5">
                       <div className="position-relative overflow-hidden rounded-3 border border-secondary" style={{ maxHeight: "160px" }}>
                         <img 
-                          src={`http://localhost:8000${latestInf.annotated_url}`} 
+                          src={`${API_BASE_URL}${latestInf.annotated_url}`} 
                           alt="Annotated Inference" 
                           className="img-fluid w-100" 
                           style={{ objectFit: "cover" }}

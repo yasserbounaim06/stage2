@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { runInference, getModels } from "../services/api";
+import { runInference, getModels, API_BASE_URL } from "../services/api";
 import { Image as ImageIcon, CheckCircle, RefreshCw, Send, Focus, Award } from "lucide-react";
 
 export default function InferencePortal() {
@@ -194,7 +194,7 @@ export default function InferencePortal() {
                       <span className="text-muted small d-block mb-2">Original Image</span>
                       <div className="border border-secondary rounded overflow-hidden">
                         <img 
-                          src={`http://localhost:8000${result.image_url}`} 
+                          src={`${API_BASE_URL}${result.image_url}`} 
                           alt="Original Input" 
                           className="img-fluid w-100" 
                           style={{ maxHeight: "300px", objectFit: "contain" }}
@@ -205,7 +205,7 @@ export default function InferencePortal() {
                       <span className="text-muted small d-block mb-2">YOLO Bounding Boxes Overlay</span>
                       <div className="border border-secondary rounded overflow-hidden">
                         <img 
-                          src={`http://localhost:8000${result.annotated_url}`} 
+                          src={`${API_BASE_URL}${result.annotated_url}`} 
                           alt="Annotated Bounding Boxes" 
                           className="img-fluid w-100" 
                           style={{ maxHeight: "300px", objectFit: "contain" }}

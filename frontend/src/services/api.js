@@ -1,4 +1,4 @@
-const API_BASE_URL = window.location.origin.includes("localhost:5173")
+export const API_BASE_URL = window.location.origin.includes("localhost:5173")
   ? "http://localhost:8000"
   : window.location.origin;
 
