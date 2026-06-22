@@ -13,9 +13,9 @@
   --color-rose: #f43f5e;
   --color-amber: #f59e0b;
   
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
   
   --font-sans: 'Plus Jakarta Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -248,4 +248,40 @@ body {
   background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
+}
+
+/* Color utilities to fix missing text styles */
+.text-indigo {
+  color: var(--color-indigo) !important;
+}
+
+.text-teal {
+  color: var(--color-teal) !important;
+}
+
+.text-violet {
+  color: var(--color-violet) !important;
+}
+
+.text-rose {
+  color: var(--color-rose) !important;
+}
+
+.text-amber {
+  color: var(--color-amber) !important;
+}
+
+/* Ensure text-muted and text-secondary match our dark mode styling */
+.text-muted {
+  color: var(--text-muted) !important;
+}
+
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+/* Styled select dropdown options */
+.form-control-custom option {
+  background-color: #121826 !important;
+  color: #ffffff !important;
 }

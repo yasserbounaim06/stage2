@@ -170,9 +170,9 @@ export default function TrainingHub({ activeJobId, setActiveJobId, datasetContex
                     className="form-select form-control-custom text-white"
                     required
                   >
-                    <option value="" style={{ color: '#000' }}>-- Select Validated Dataset --</option>
+                    <option value="">-- Select Validated Dataset --</option>
                     {datasets.map(ds => (
-                      <option key={ds.id} value={ds.id} style={{ color: '#000' }}>
+                      <option key={ds.id} value={ds.id}>
                         #{ds.id} - {ds.name} ({ds.num_images} images)
                       </option>
                     ))}
